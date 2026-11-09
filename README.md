@@ -9,7 +9,7 @@
 > documentation is accurate and fully applicable — see the Documentation section
 > of `instructions.md` for links.
 
-[Lidarr](https://github.com/Lidarr/Lidarr) manages a music collection by monitoring artists, acquiring releases through download clients, and importing tracks. This package follows Sonarr's shared-storage and managed-login integration.
+[Lidarr](https://github.com/Lidarr/Lidarr) manages a music collection by monitoring artists, acquiring releases through download clients, and importing tracks.
 
 - **Wrapper repo:** <https://github.com/Start9Labs/lidarr-startos>
 
@@ -34,7 +34,7 @@
 
 ## Image and Container Runtime
 
-The unmodified `linuxserver/lidarr` image runs its `/init` entrypoint as PID 1 (`runAsInit`), with `PUID=1000`, `PGID=1000`, and `TZ=Etc/UTC`. It supports x86_64 and aarch64. The primary daemon's subcontainer is `lidarr-sub`.
+The unmodified `lscr.io/linuxserver/lidarr` image runs its `/init` entrypoint as PID 1 (`runAsInit`), with `PUID=1000`, `PGID=1000`, and `TZ=Etc/UTC`. It supports x86_64 and aarch64. The primary daemon's subcontainer is `lidarr-sub`.
 
 The image's init owns `/config` as uid 1000. Its Docker update mechanism disables in-app updates. The `reconcile` oneshot runs after daemon readiness on every start, calling the local API to apply the stored admin login and reconcile the optional qBittorrent client.
 
@@ -160,7 +160,7 @@ This summary lists the package's operating surface without duplicating version p
 
 ```yaml
 package_id: lidarr
-image: linuxserver/lidarr
+image: lscr.io/linuxserver/lidarr
 architectures: [x86_64, aarch64]
 subcontainers: [lidarr-sub]
 volumes:

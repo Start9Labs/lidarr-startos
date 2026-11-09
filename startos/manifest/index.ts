@@ -13,7 +13,7 @@ export const manifest = setupManifest({
   volumes: ['startos', 'main'],
   images: {
     lidarr: {
-      source: { dockerTag: 'linuxserver/lidarr:3.1.6.5079-ls47' },
+      source: { dockerTag: 'lscr.io/linuxserver/lidarr:3.1.6.5079-ls47' },
       arch: ['x86_64', 'aarch64'],
     },
   },
