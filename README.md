@@ -90,7 +90,7 @@ One interface serves the browser UI and authenticated API over the same HTTP lis
 | --- | --- | --- | --- | --- |
 | `ui` | `ui-multi` | `ui` | 8686 | Web UI and API |
 
-`uiHostId` and `uiPort` are exported from `startos/utils.ts`. `share/api-key` on the `startos` volume is the read-only sharing surface for future dependents; no dependent should mount the rest of the store. Manual Prowlarr setup uses the UI's API-key setting.
+`uiHostId` and `uiPort` are exported from `startos/utils.ts`. Prowlarr resolves that binding and mounts `share/api-key` on the `startos` volume read-only when Lidarr is selected in its Connect Apps action. No dependent should mount the rest of the store.
 
 ## Installation and First-Run Flow
 
@@ -147,7 +147,7 @@ The package deliberately owns access control and networking while leaving music-
 
 1. The admin username, password, authentication method, listener settings, allowed hosts, proxy trust, and API key are package-managed; conflicting UI edits are reverted on restart.
 2. There is no package-local music library or access to qBittorrent-local downloads. Media must be on selected file-manager volumes.
-3. Prowlarr integration is manual; its Connect Apps action does not include Lidarr.
+3. Automatic Prowlarr indexer sync is configured in Prowlarr's Connect Apps action, not in a Lidarr action.
 4. No downloader, player, or private metadata server is bundled. Metadata availability remains an external requirement.
 5. Upstream handles database upgrades on startup; downgrades are not declared safe. Restore an older backup instead.
 6. No riscv64 image is available.

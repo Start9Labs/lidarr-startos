@@ -21,7 +21,7 @@ You get an authenticated Web UI, a generated admin login, shared music storage i
 6. Create a music folder in your file manager, separate from your download folder. In Lidarr, open **Settings → Media Management → Root Folders** and add it:
    - FileBrowser Quantum: `/mnt/filebrowser/music`
    - NextExplorer: `/mnt/nextexplorer/<location>/music`, where `<location>` is a location such as `Files`.
-7. Add indexers in Lidarr's **Settings → Indexers**. If you use Prowlarr, add Lidarr manually in Prowlarr's **Settings → Apps**, using Lidarr's address and the API key from Lidarr's **Settings → General → Security**. Prowlarr's StartOS **Connect Apps** action does not include Lidarr.
+7. Add indexers in Lidarr's **Settings → Indexers**. If you use Prowlarr on this server, select Lidarr in Prowlarr's **Connect Apps** action. Indexers configured in Prowlarr then sync to Lidarr without copying API keys.
 8. Choose your quality and metadata profiles, then add an artist with **Library → Add New**. Follow the upstream quick-start guide for monitoring and searching.
 
 Keep downloads and the music library in different directories on the same selected file manager for hardlinks and fast moves. Lidarr cannot import downloads saved only inside qBittorrent's local storage.
