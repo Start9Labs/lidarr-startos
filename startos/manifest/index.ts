@@ -10,7 +10,7 @@ export const manifest = setupManifest({
   marketingUrl: 'https://lidarr.audio/',
   donationUrl: 'https://opencollective.com/lidarr',
   description: { short, long },
-  volumes: ['startos', 'main'],
+  volumes: ['startos', 'main', 'public'],
   images: {
     lidarr: {
       source: { dockerTag: 'lscr.io/linuxserver/lidarr:3.1.6.5079-ls47' },

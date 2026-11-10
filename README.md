@@ -40,15 +40,16 @@ The image's init owns `/config` as uid 1000. Its Docker update mechanism disable
 
 ## Volume and Data Layout
 
-Lidarr owns two volumes. Media files live on selected file-manager volumes, mounted read-write.
+Lidarr owns three volumes. Media files live on selected file-manager volumes, mounted read-write.
 
 | Volume | Mount point | Contents |
 | --- | --- | --- |
 | `main` | `/config` | `config.xml`, `lidarr.db`, `logs.db`, `MediaCover/`, logs, application backups, and other upstream app data |
-| `startos` | Not mounted | `store.json` and `share/api-key` |
+| `startos` | Not mounted | `store.json` |
+| `public` | Not mounted | `api-key`, for dependents to mount read-only |
 | FileBrowser Quantum `data` | `/mnt/filebrowser` | Shared media and completed downloads, while selected and installed |
 | NextExplorer `data` | `/mnt/nextexplorer` | Shared media and completed downloads, one folder per location, while selected and installed |
-| qBittorrent `main/share` | `/mnt/qbittorrent` (read-only) | Its Web API key, while connected and installed |
+| qBittorrent `public` | `/mnt/qbittorrent` (read-only) | Its Web API key, while connected and installed |
 
 The media mount points match qBittorrent and Jellyfin. Download paths reported by qBittorrent therefore need no remote path mapping. A download and library directory on the same mount can share hardlinks; different file managers cannot.
 
@@ -60,7 +61,7 @@ Three models separate package state, upstream configuration, and the API-key sha
 | --- | --- | --- |
 | `startos/store.json` | JSON | Install seeds `apiKey`; actions set `adminPassword`, `mediaSources`, and `qbittorrentConnected`; reconciliation records `qbittorrentClientId` |
 | `main/config.xml` | XML | Install disables analytics; every start merges the managed keys below, preserving other keys |
-| `startos/share/api-key` | Text | Init publishes the stored API key, without a newline |
+| `public/api-key` | Text | Init publishes the stored API key, without a newline |
 
 The stored admin password is plaintext on the unmounted `startos` volume because Lidarr's API requires the original value to reconcile its hashed credential. It is never placed in `config.xml` or written directly into the database.
 
@@ -90,7 +91,7 @@ One interface serves the browser UI and authenticated API over the same HTTP lis
 | --- | --- | --- | --- | --- |
 | `ui` | `ui-multi` | `ui` | 8686 | Web UI and API |
 
-`uiHostId` and `uiPort` are exported from `startos/utils.ts`. `share/api-key` on the `startos` volume is the read-only sharing surface for future dependents; no dependent should mount the rest of the store. Manual Prowlarr setup uses the UI's API-key setting.
+`uiHostId` and `uiPort` are exported from `startos/utils.ts`. Prowlarr resolves that binding and mounts the `public` volume read-only when Lidarr is selected in its Connect Apps action; `api-key` at its root is all that volume holds.
 
 ## Installation and First-Run Flow
 
@@ -135,7 +136,7 @@ A prolonged failure means startup, a database migration, or a crash needs invest
 
 ## Backups and Restore
 
-StartOS stops Lidarr and copies both own volumes. The SQLite database is quiescent; no separate database daemon or dump is needed.
+StartOS stops Lidarr and copies the `startos` and `main` volumes. The SQLite database is quiescent; no separate database daemon or dump is needed. The `public` volume is not backed up; init rewrites `api-key` from `store.json`.
 
 Excluded paths are `MediaCover/` (downloadable artwork), `logs/`, `logs.db*`, and `Backups/` (redundant application database backups). All remaining app data, package settings, credentials, and the API key are captured. Restore reuses them and reconciles the download client's live address and key at the next start.
 
@@ -147,7 +148,7 @@ The package deliberately owns access control and networking while leaving music-
 
 1. The admin username, password, authentication method, listener settings, allowed hosts, proxy trust, and API key are package-managed; conflicting UI edits are reverted on restart.
 2. There is no package-local music library or access to qBittorrent-local downloads. Media must be on selected file-manager volumes.
-3. Prowlarr integration is manual; its Connect Apps action does not include Lidarr.
+3. Automatic Prowlarr indexer sync is configured in Prowlarr's Connect Apps action, not in a Lidarr action.
 4. No downloader, player, or private metadata server is bundled. Metadata availability remains an external requirement.
 5. Upstream handles database upgrades on startup; downgrades are not declared safe. Restore an older backup instead.
 6. No riscv64 image is available.
@@ -165,11 +166,12 @@ architectures: [x86_64, aarch64]
 subcontainers: [lidarr-sub]
 volumes:
   main: /config
-  startos: store.json and share/api-key (not mounted)
+  startos: store.json (not mounted)
+  public: api-key (not mounted)
 file_models:
   - startos/store.json
   - main/config.xml
-  - startos/share/api-key
+  - public/api-key
 startos_managed_env_vars: [PUID, PGID, TZ]
 dependencies: [filebrowser, nextexplorer, qbittorrent]
 interfaces:
