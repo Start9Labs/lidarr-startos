@@ -57,3 +57,16 @@ export const qbittorrentDescription = {
   fr_FR:
     "Optionnel. Lidarr envoie les téléchargements à qBittorrent une fois connecté avec l'action Connecter qBittorrent.",
 }
+
+export const nzbgetDescription = {
+  en_US:
+    'Optional. Lets Lidarr send Usenet downloads to NZBGet. Enabled with Connect NZBGet.',
+  es_ES:
+    'Opcional. Permite que Lidarr envíe descargas de Usenet a NZBGet. Se activa con Conectar NZBGet.',
+  de_DE:
+    'Optional. Ermöglicht Lidarr, Usenet-Downloads an NZBGet zu senden. Aktivierung über NZBGet verbinden.',
+  pl_PL:
+    'Opcjonalne. Pozwala Lidarr wysyłać pobrania z Usenetu do NZBGet. Włączane w Połącz NZBGet.',
+  fr_FR:
+    'Optionnel. Permet à Lidarr d’envoyer les téléchargements Usenet à NZBGet. À activer avec Connecter NZBGet.',
+}
