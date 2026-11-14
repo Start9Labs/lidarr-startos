@@ -9,7 +9,7 @@ import { storeJson } from './fileModels/store.json'
 export const uiPort = 8686
 export const uiHostId = 'ui-multi'
 export const adminUsername = 'admin'
-// Shared media paths must match qBittorrent and Jellyfin.
+// Shared media paths must match qBittorrent, NZBGet and Jellyfin.
 export const filebrowserMountpoint = '/mnt/filebrowser'
 export const nextexplorerMountpoint = '/mnt/nextexplorer'
 export const qbittorrentMountpoint = '/mnt/qbittorrent'
@@ -101,6 +101,7 @@ export async function reconcile(
             password: nzbget.credentials.password,
           }
         : null,
+    // NZBGet seeds this category.
     defaults: { musicCategory: 'lidarr' },
   })
   if (
