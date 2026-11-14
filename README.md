@@ -85,7 +85,7 @@ Both file managers use uid 1000, matching Lidarr. Selection remains stored when 
 
 qBittorrent's bridge address comes from its exported host id and internal port, imported from its package. The address and shared API key are watched reactively; changes restart Lidarr and update the managed client. While qBittorrent is absent, its existing client record is left untouched.
 
-NZBGet is resolved through its exported binding in the same way. Its `public/credentials.json` is watched reactively, and startup reconciles its separate restricted username/password into Lidarr's database. Missing addresses or credentials leave the existing managed record untouched; it heals when the dependency returns. Credentials are not copied into this package's own file models, though Lidarr's database retains its configured client credential.
+NZBGet is resolved through its exported binding in the same way. Only the username and password from its `public/credentials.json` are watched reactively; changing NZBGet's published download path does not restart Lidarr. Startup reconciles the separate restricted username/password into Lidarr's database. Missing addresses or credentials leave the existing managed record untouched; it heals when the dependency returns. Credentials are not copied into this package's own file models, though Lidarr's database retains its configured client credential.
 
 ## Network Access and Interfaces
 
