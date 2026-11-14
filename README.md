@@ -36,7 +36,7 @@
 
 The unmodified `lscr.io/linuxserver/lidarr` image runs its `/init` entrypoint as PID 1 (`runAsInit`), with `PUID=1000`, `PGID=1000`, and `TZ=Etc/UTC`. It supports x86_64 and aarch64. The primary daemon's subcontainer is `lidarr-sub`.
 
-The image's init owns `/config` as uid 1000. Its Docker update mechanism disables in-app updates. The `reconcile` oneshot runs after daemon readiness on every start, calling the local API to apply the stored admin login and reconcile the optional qBittorrent and NZBGet clients through a shared Arr download-client primitive.
+The image's init owns `/config` as uid 1000. Its Docker update mechanism disables in-app updates. The `reconcile` oneshot runs after daemon readiness on every start, calling the local API to apply the stored admin login and reconcile the optional qBittorrent and NZBGet clients through `reconcileArrDownloadClient`, imported from `nzbget-startos`.
 
 ## Volume and Data Layout
 
@@ -123,7 +123,9 @@ The package owns that client's name, enabled state, host, port, SSL flag, API ke
 
 ### Connect NZBGet / Disconnect NZBGet
 
-Run to toggle `nzbgetConnected` and the reserved `NZBGet (StartOS)` client, independently of qBittorrent. It costs a restart. Reconciliation reuses its stored id or case-insensitive name; repeating the action reverses the selection, with confirmation before disconnecting. The initial category is `lidarr`; later category and non-connection settings remain user-owned. Only the reserved client's connection fields and enabled state are reapplied. Select NZBGet's file manager in Media Storage for imports; manually named clients are untouched.
+Run to toggle the Usenet download-client integration, independently of qBittorrent. It changes `nzbgetConnected`; reconciliation creates, updates, or deletes the client named `NZBGet (StartOS)`, tracked and recovered like the qBittorrent client. Imports need NZBGet's file manager selected in Media Storage.
+
+The package owns that client's name, enabled state, host, port, SSL flag, username, and password; the credentials are NZBGet's restricted integration login, not its admin password. A new client gets category `lidarr`, which NZBGet defines; after that the category and other fields remain user-controlled. Other manually added clients are untouched unless they use the reserved name. Repeated reconciliation reuses the record rather than duplicating it. Repeating the action reverses the selection. Toggling costs a restart.
 
 ## Tasks
 
@@ -146,7 +148,7 @@ A prolonged failure means startup, a database migration, or a crash needs invest
 
 StartOS stops Lidarr and copies the `startos` and `main` volumes. The SQLite database is quiescent; no separate database daemon or dump is needed. The `public` volume is not backed up; init rewrites `api-key` from `store.json`.
 
-Excluded paths are `MediaCover/` (downloadable artwork), `logs/`, `logs.db*`, and `Backups/` (redundant application database backups). All remaining app data, package settings, credentials, and the API key are captured. Restore reuses them and reconciles the download client's live address and key at the next start.
+Excluded paths are `MediaCover/` (downloadable artwork), `logs/`, `logs.db*`, and `Backups/` (redundant application database backups). All remaining app data, package settings, credentials, and the API key are captured. Restore reuses them, and the next start reconciles each managed download client with its downloader's live address and credentials.
 
 Mounted dependency volumes are outside this backup. Their data must be restored separately; otherwise the restored database references unavailable music.
 
