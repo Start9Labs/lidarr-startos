@@ -37,6 +37,10 @@ const dict = {
   'Removes the qBittorrent (StartOS) download client from Lidarr.': 22,
   'Connect qBittorrent': 23,
   'Add qBittorrent on this server as a download client in Lidarr. Changing it restarts Lidarr.': 24,
+  'Disconnect NZBGet': 25,
+  'Connect NZBGet': 26,
+  'Manage the NZBGet download client. Changing the connection restarts the service; select the same shared storage for imports.': 27,
+  'Removes only the NZBGet (StartOS) download client.': 28,
 } as const
 
 /**

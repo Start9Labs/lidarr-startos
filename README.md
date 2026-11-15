@@ -36,7 +36,7 @@
 
 The unmodified `lscr.io/linuxserver/lidarr` image runs its `/init` entrypoint as PID 1 (`runAsInit`), with `PUID=1000`, `PGID=1000`, and `TZ=Etc/UTC`. It supports x86_64 and aarch64. The primary daemon's subcontainer is `lidarr-sub`.
 
-The image's init owns `/config` as uid 1000. Its Docker update mechanism disables in-app updates. The `reconcile` oneshot runs after daemon readiness on every start, calling the local API to apply the stored admin login and reconcile the optional qBittorrent client.
+The image's init owns `/config` as uid 1000. Its Docker update mechanism disables in-app updates. The `reconcile` oneshot runs after daemon readiness on every start, calling the local API to apply the stored admin login and reconcile the optional qBittorrent and NZBGet clients through `reconcileArrDownloadClient`, imported from `nzbget-startos`.
 
 ## Volume and Data Layout
 
@@ -50,8 +50,9 @@ Lidarr owns three volumes. Media files live on selected file-manager volumes, mo
 | FileBrowser Quantum `data` | `/mnt/filebrowser` | Shared media and completed downloads, while selected and installed |
 | NextExplorer `data` | `/mnt/nextexplorer` | Shared media and completed downloads, one folder per location, while selected and installed |
 | qBittorrent `public` | `/mnt/qbittorrent` (read-only) | Its Web API key, while connected and installed |
+| NZBGet `public` | `/mnt/nzbget` (read-only) | Restricted integration credentials, while connected and installed |
 
-The media mount points match qBittorrent and Jellyfin. Download paths reported by qBittorrent therefore need no remote path mapping. A download and library directory on the same mount can share hardlinks; different file managers cannot.
+The media mount points match qBittorrent, NZBGet and Jellyfin. Download paths reported by either downloader therefore need no remote path mapping. A download and library directory on the same mount can share hardlinks; different file managers cannot.
 
 ## File Models
 
@@ -59,7 +60,7 @@ Three models separate package state, upstream configuration, and the API-key sha
 
 | File | Format | Ownership |
 | --- | --- | --- |
-| `startos/store.json` | JSON | Install seeds `apiKey`; actions set `adminPassword`, `mediaSources`, and `qbittorrentConnected`; reconciliation records `qbittorrentClientId` |
+| `startos/store.json` | JSON | Install seeds `apiKey`; actions set `adminPassword`, `mediaSources`, `qbittorrentConnected` and `nzbgetConnected`; reconciliation records each managed client id |
 | `main/config.xml` | XML | Install disables analytics; every start merges the managed keys below, preserving other keys |
 | `public/api-key` | Text | Init publishes the stored API key, without a newline |
 
@@ -71,17 +72,20 @@ On every start, the package enforces `ApiKey`, Forms authentication, authenticat
 
 ## Dependencies
 
-All three dependencies are optional integrations, activated by the stored selection.
+All four dependencies are optional integrations, activated by the stored selection.
 
 | Dependency | Requirement while selected | Purpose |
 | --- | --- | --- |
 | `filebrowser` | Installed (`exists`) | Read-write `data` mount for media |
 | `nextexplorer` | Installed (`exists`) | Read-write `data` mount for media |
 | `qbittorrent` | Running, health check `primary` | Download API and read-only key share |
+| `nzbget` | Running, health check `primary` | Usenet API and read-only restricted credentials |
 
 Both file managers use uid 1000, matching Lidarr. Selection remains stored when a dependency is uninstalled, but the missing volume is not mounted. Lidarr can still start; its missing root folders cannot be scanned or imported into. Reinstalling the dependency re-evaluates the mounts.
 
 qBittorrent's bridge address comes from its exported host id and internal port, imported from its package. The address and shared API key are watched reactively; changes restart Lidarr and update the managed client. While qBittorrent is absent, its existing client record is left untouched.
+
+NZBGet is resolved through its exported binding in the same way. Only the username and password from its `public/credentials.json` are watched reactively; changing NZBGet's published download path does not restart Lidarr. Startup reconciles the separate restricted username/password into Lidarr's database. Missing addresses or credentials leave the existing managed record untouched; it heals when the dependency returns. Credentials are not copied into this package's own file models, though Lidarr's database retains its configured client credential.
 
 ## Network Access and Interfaces
 
@@ -101,7 +105,7 @@ Before the first daemon launch, Forms authentication is enforced without an exis
 
 ## Actions
 
-Three actions write package state; changes read by `main` restart the service and apply on the next start if it was stopped.
+Four actions write package state; changes read by `main` restart the service and apply on the next start if it was stopped.
 
 ### Set Admin Password / Reset Admin Password
 
@@ -116,6 +120,12 @@ Run when selecting or changing file-manager storage. It changes `mediaSources` a
 Run to toggle the local download-client integration. It changes `qbittorrentConnected`; reconciliation creates, updates, or deletes the client named `qBittorrent (StartOS)`. The client is tracked by id, with its case-insensitive unique name recovering an interrupted initial create.
 
 The package owns that client's name, enabled state, host, port, SSL flag, API key, username, and password. Other fields, including its music category, remain user-controlled. Other manually added clients are untouched unless they use the reserved name. Creating the client disabled and then enabling it with `forceSave` avoids testing a dependency that may still be starting. Repeated reconciliation reuses the record rather than duplicating it. Toggling costs a restart.
+
+### Connect NZBGet / Disconnect NZBGet
+
+Run to toggle the Usenet download-client integration, independently of qBittorrent. It changes `nzbgetConnected`; reconciliation creates, updates, or deletes the client named `NZBGet (StartOS)`, tracked and recovered like the qBittorrent client. Imports need NZBGet's file manager selected in Media Storage.
+
+The package owns that client's name, enabled state, host, port, SSL flag, username, and password; the credentials are NZBGet's restricted integration login, not its admin password. A new client gets category `lidarr`, which NZBGet defines; after that the category and other fields remain user-controlled. Other manually added clients are untouched unless they use the reserved name. Repeated reconciliation reuses the record rather than duplicating it. Repeating the action reverses the selection. Toggling costs a restart.
 
 ## Tasks
 
@@ -138,7 +148,7 @@ A prolonged failure means startup, a database migration, or a crash needs invest
 
 StartOS stops Lidarr and copies the `startos` and `main` volumes. The SQLite database is quiescent; no separate database daemon or dump is needed. The `public` volume is not backed up; init rewrites `api-key` from `store.json`.
 
-Excluded paths are `MediaCover/` (downloadable artwork), `logs/`, `logs.db*`, and `Backups/` (redundant application database backups). All remaining app data, package settings, credentials, and the API key are captured. Restore reuses them and reconciles the download client's live address and key at the next start.
+Excluded paths are `MediaCover/` (downloadable artwork), `logs/`, `logs.db*`, and `Backups/` (redundant application database backups). All remaining app data, package settings, credentials, and the API key are captured. Restore reuses them, and the next start reconciles each managed download client with its downloader's live address and credentials.
 
 Mounted dependency volumes are outside this backup. Their data must be restored separately; otherwise the restored database references unavailable music.
 
@@ -173,10 +183,10 @@ file_models:
   - main/config.xml
   - public/api-key
 startos_managed_env_vars: [PUID, PGID, TZ]
-dependencies: [filebrowser, nextexplorer, qbittorrent]
+dependencies: [filebrowser, nextexplorer, qbittorrent, nzbget]
 interfaces:
   ui: {host_id: ui-multi, type: ui, port: 8686, protocol: http}
-actions: [set-admin-password, media-storage, connect-qbittorrent]
+actions: [set-admin-password, media-storage, connect-qbittorrent, connect-nzbget]
 tasks:
   - {action: set-admin-password, severity: critical}
   - {action: media-storage, severity: critical}

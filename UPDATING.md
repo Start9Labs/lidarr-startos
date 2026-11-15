@@ -21,6 +21,6 @@ Read upstream's release notes for database migrations, upgrade restrictions, and
 
 ## Verify the update
 
-Update dependencies with `npm install`, then run `npx tsc --noEmit`. Confirm the API still accepts host-config credential updates and the qBittorrent schema still supports API-key authentication. Keep the shared media mount points unchanged. CI builds both supported architectures.
+Update dependencies with `npm install`, then run `npx tsc --noEmit`. Confirm the API still accepts host-config credential updates, the qBittorrent schema still supports API-key authentication, and the `Nzbget` schema still has `host`, `port`, `useSsl`, `username`, `password` and `musicCategory` fields; reconciliation silently skips a field the schema lacks. Keep the shared media mount points unchanged. CI builds both supported architectures.
 
 Do not use Lidarr's in-app updater. Git tags use `v<upstream>_<downstream>`.
