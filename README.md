@@ -36,21 +36,22 @@
 
 The unmodified `lscr.io/linuxserver/lidarr` image runs its `/init` entrypoint as PID 1 (`runAsInit`), with `PUID=1000`, `PGID=1000`, and `TZ=Etc/UTC`. It supports x86_64 and aarch64. The primary daemon's subcontainer is `lidarr-sub`.
 
-The image's init owns `/config` as uid 1000. Its Docker update mechanism disables in-app updates. The `reconcile` oneshot runs after daemon readiness on every start, calling the local API to apply the stored admin login and reconcile the optional qBittorrent and NZBGet clients through `reconcileArrDownloadClient`, imported from `nzbget-startos`.
+The image's init owns `/config` as uid 1000. Its Docker update mechanism disables in-app updates. The `reconcile` oneshot runs after daemon readiness on every start, calling the local API to apply the stored admin login and reconcile the optional qBittorrent and NZBGet clients through `reconcileArrDownloadClient`, imported from `nzbget-startos`. A separate `prowlarr` oneshot manages Lidarr's application record in Prowlarr (see [Dependencies](#dependencies)).
 
 ## Volume and Data Layout
 
 Lidarr owns three volumes. Media files live on selected file-manager volumes, mounted read-write.
 
-| Volume | Mount point | Contents |
-| --- | --- | --- |
-| `main` | `/config` | `config.xml`, `lidarr.db`, `logs.db`, `MediaCover/`, logs, application backups, and other upstream app data |
-| `startos` | Not mounted | `store.json` |
-| `public` | Not mounted | `api-key`, for dependents to mount read-only |
-| FileBrowser Quantum `data` | `/mnt/filebrowser` | Shared media and completed downloads, while selected and installed |
-| NextExplorer `data` | `/mnt/nextexplorer` | Shared media and completed downloads, one folder per location, while selected and installed |
-| qBittorrent `public` | `/mnt/qbittorrent` (read-only) | Its Web API key, while connected and installed |
-| NZBGet `public` | `/mnt/nzbget` (read-only) | Restricted integration credentials, while connected and installed |
+| Volume                     | Mount point                    | Contents                                                                                                    |
+| -------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `main`                     | `/config`                      | `config.xml`, `lidarr.db`, `logs.db`, `MediaCover/`, logs, application backups, and other upstream app data |
+| `startos`                  | Not mounted                    | `store.json`                                                                                                |
+| `public`                   | Not mounted                    | `api-key`, for dependents to mount read-only                                                                |
+| FileBrowser Quantum `data` | `/mnt/filebrowser`             | Shared media and completed downloads, while selected and installed                                          |
+| NextExplorer `data`        | `/mnt/nextexplorer`            | Shared media and completed downloads, one folder per location, while selected and installed                 |
+| qBittorrent `public`       | `/mnt/qbittorrent` (read-only) | Its Web API key, while connected and installed                                                              |
+| NZBGet `public`            | `/mnt/nzbget` (read-only)      | Restricted integration credentials, while connected and installed                                           |
+| Prowlarr `public`          | `/mnt/prowlarr` (read-only)    | Its API key, while installed and the connection is on or undecided                                          |
 
 The media mount points match qBittorrent, NZBGet and Jellyfin. Download paths reported by either downloader therefore need no remote path mapping. A download and library directory on the same mount can share hardlinks; different file managers cannot.
 
@@ -58,11 +59,11 @@ The media mount points match qBittorrent, NZBGet and Jellyfin. Download paths re
 
 Three models separate package state, upstream configuration, and the API-key sharing contract.
 
-| File | Format | Ownership |
-| --- | --- | --- |
-| `startos/store.json` | JSON | Install seeds `apiKey`; actions set `adminPassword`, `mediaSources`, `qbittorrentConnected` and `nzbgetConnected`; reconciliation records each managed client id |
-| `main/config.xml` | XML | Install disables analytics; every start merges the managed keys below, preserving other keys |
-| `public/api-key` | Text | Init publishes the stored API key, without a newline |
+| File                 | Format | Ownership                                                                                                                                                                                                 |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `startos/store.json` | JSON   | Install seeds `apiKey`; actions set `adminPassword`, `mediaSources`, `qbittorrentConnected`, `nzbgetConnected` and `prowlarrConnected`; reconciliation records each managed client id and `prowlarrAppId` |
+| `main/config.xml`    | XML    | Install disables analytics; every start merges the managed keys below, preserving other keys                                                                                                              |
+| `public/api-key`     | Text   | Init publishes the stored API key, without a newline                                                                                                                                                      |
 
 The stored admin password is plaintext on the unmounted `startos` volume because Lidarr's API requires the original value to reconcile its hashed credential. It is never placed in `config.xml` or written directly into the database.
 
@@ -72,14 +73,15 @@ On every start, the package enforces `ApiKey`, Forms authentication, authenticat
 
 ## Dependencies
 
-All four dependencies are optional integrations, activated by the stored selection.
+All five dependencies are optional integrations, activated by the stored selection.
 
-| Dependency | Requirement while selected | Purpose |
-| --- | --- | --- |
-| `filebrowser` | Installed (`exists`) | Read-write `data` mount for media |
-| `nextexplorer` | Installed (`exists`) | Read-write `data` mount for media |
-| `qbittorrent` | Running, health check `primary` | Download API and read-only key share |
-| `nzbget` | Running, health check `primary` | Usenet API and read-only restricted credentials |
+| Dependency     | Requirement while selected      | Purpose                                         |
+| -------------- | ------------------------------- | ----------------------------------------------- |
+| `filebrowser`  | Installed (`exists`)            | Read-write `data` mount for media               |
+| `nextexplorer` | Installed (`exists`)            | Read-write `data` mount for media               |
+| `qbittorrent`  | Running, health check `primary` | Download API and read-only key share            |
+| `nzbget`       | Running, health check `primary` | Usenet API and read-only restricted credentials |
+| `prowlarr`     | Running, health check `primary` | Indexer sync and read-only API key share        |
 
 Both file managers use uid 1000, matching Lidarr. Selection remains stored when a dependency is uninstalled, but the missing volume is not mounted. Lidarr can still start; its missing root folders cannot be scanned or imported into. Reinstalling the dependency re-evaluates the mounts.
 
@@ -87,15 +89,19 @@ qBittorrent's bridge address comes from its exported host id and internal port, 
 
 NZBGet is resolved through its exported binding in the same way. Only the username and password from its `public/credentials.json` are watched reactively; changing NZBGet's published download path does not restart Lidarr. Startup reconciles the separate restricted username/password into Lidarr's database. Missing addresses or credentials leave the existing managed record untouched; it heals when the dependency returns. Credentials are not copied into this package's own file models, though Lidarr's database retains its configured client credential.
 
+Prowlarr is resolved through its exported binding as well, and its API key read from `/mnt/prowlarr/api-key`; a change to either restarts Lidarr. The `prowlarr` oneshot calls `reconcileProwlarrApplication`, imported from `prowlarr-startos`: connected, it creates or updates the application `Lidarr (StartOS)` in Prowlarr with Lidarr's own bridge address and API key and sync level **Full Sync**, adopting a record by its stored id, that name, or the name `Lidarr` an earlier Prowlarr release created; disconnected, it deletes that record. It does not require `primary` and retries until Prowlarr answers. While Prowlarr is absent nothing of it is mounted, and a pending removal is dropped. Prowlarr deletes the record itself when Lidarr is uninstalled.
+
+`prowlarrConnected` is `null` on an install updated from a release without **Connect Prowlarr**: once Prowlarr answers, it becomes `true`, keeping the record, if Prowlarr already has one for Lidarr, and `false` otherwise. Fresh installs start at `false`.
+
 ## Network Access and Interfaces
 
 One interface serves the browser UI and authenticated API over the same HTTP listener.
 
-| Id | Host id | Type | Internal port | Purpose |
-| --- | --- | --- | --- | --- |
-| `ui` | `ui-multi` | `ui` | 8686 | Web UI and API |
+| Id   | Host id    | Type | Internal port | Purpose        |
+| ---- | ---------- | ---- | ------------- | -------------- |
+| `ui` | `ui-multi` | `ui` | 8686          | Web UI and API |
 
-`uiHostId` and `uiPort` are exported from `startos/utils.ts`. Prowlarr resolves that binding and mounts the `public` volume read-only when Lidarr is selected in its Connect Apps action; `api-key` at its root is all that volume holds.
+`uiHostId` and `uiPort` are exported from `startos/utils.ts` for dependents, which mount the `public` volume read-only; `api-key` at its root is all that volume holds. Lidarr hands Prowlarr its address and key itself.
 
 ## Installation and First-Run Flow
 
@@ -127,14 +133,18 @@ Run to toggle the Usenet download-client integration, independently of qBittorre
 
 The package owns that client's name, enabled state, host, port, SSL flag, username, and password; the credentials are NZBGet's restricted integration login, not its admin password. A new client gets category `lidarr`, which NZBGet defines; after that the category and other fields remain user-controlled. Other manually added clients are untouched unless they use the reserved name. Repeated reconciliation reuses the record rather than duplicating it. Repeating the action reverses the selection. Toggling costs a restart.
 
+### Connect Prowlarr / Disconnect Prowlarr
+
+Run once Prowlarr is installed so it syncs its indexers into Lidarr; run again to disconnect. It changes `prowlarrConnected`, which declares the dependency and has the `prowlarr` oneshot create or delete `Lidarr (StartOS)` in Prowlarr's **Settings → Apps**. Name, URLs, API key and sync level are reapplied on every start; sync categories and tags remain user-controlled. Disconnecting stops the sync, but indexers Prowlarr already added (named `<indexer> (Prowlarr)`) stay in Lidarr until deleted there. Toggling costs a restart.
+
 ## Tasks
 
 Two critical prompts block startup while essential setup is incomplete.
 
-| Action | Raised when | Cleared by |
-| --- | --- | --- |
-| Set Admin Password | `adminPassword` is unset | Generating the password |
-| Media Storage | `mediaSources` is empty | Selecting at least one file manager |
+| Action             | Raised when              | Cleared by                          |
+| ------------------ | ------------------------ | ----------------------------------- |
+| Set Admin Password | `adminPassword` is unset | Generating the password             |
+| Media Storage      | `mediaSources` is empty  | Selecting at least one file manager |
 
 Init rechecks these conditions reactively, so clearing the stored values can raise the prompts again.
 
@@ -158,7 +168,7 @@ The package deliberately owns access control and networking while leaving music-
 
 1. The admin username, password, authentication method, listener settings, allowed hosts, proxy trust, and API key are package-managed; conflicting UI edits are reverted on restart.
 2. There is no package-local music library or access to qBittorrent-local downloads. Media must be on selected file-manager volumes.
-3. Automatic Prowlarr indexer sync is configured in Prowlarr's Connect Apps action, not in a Lidarr action.
+3. Prowlarr indexer sync covers Prowlarr on this server only, connected with Connect Prowlarr.
 4. No downloader, player, or private metadata server is bundled. Metadata availability remains an external requirement.
 5. Upstream handles database upgrades on startup; downgrades are not declared safe. Restore an older backup instead.
 6. No riscv64 image is available.
@@ -183,13 +193,20 @@ file_models:
   - main/config.xml
   - public/api-key
 startos_managed_env_vars: [PUID, PGID, TZ]
-dependencies: [filebrowser, nextexplorer, qbittorrent, nzbget]
+dependencies: [filebrowser, nextexplorer, qbittorrent, nzbget, prowlarr]
 interfaces:
-  ui: {host_id: ui-multi, type: ui, port: 8686, protocol: http}
-actions: [set-admin-password, media-storage, connect-qbittorrent, connect-nzbget]
+  ui: { host_id: ui-multi, type: ui, port: 8686, protocol: http }
+actions:
+  [
+    set-admin-password,
+    media-storage,
+    connect-qbittorrent,
+    connect-nzbget,
+    connect-prowlarr,
+  ]
 tasks:
-  - {action: set-admin-password, severity: critical}
-  - {action: media-storage, severity: critical}
+  - { action: set-admin-password, severity: critical }
+  - { action: media-storage, severity: critical }
 health_checks: [primary]
-oneshots: [reconcile]
+oneshots: [reconcile, prowlarr]
 ```

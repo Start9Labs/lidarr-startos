@@ -9,7 +9,7 @@
 
 ## What you get on StartOS
 
-You get an authenticated Web UI, a generated admin login, shared music storage in FileBrowser Quantum or NextExplorer, and optional connections to qBittorrent and NZBGet on this server. You can play the resulting music through a separate music or media server that reads the same folder.
+You get an authenticated Web UI, a generated admin login, shared music storage in FileBrowser Quantum or NextExplorer, and optional connections to qBittorrent, NZBGet and Prowlarr on this server. You can play the resulting music through a separate music or media server that reads the same folder.
 
 ## Getting set up
 
@@ -21,7 +21,7 @@ You get an authenticated Web UI, a generated admin login, shared music storage i
 6. Create a music folder in your file manager, separate from your download folder. In Lidarr, open **Settings → Media Management → Root Folders** and add it:
    - FileBrowser Quantum: `/mnt/filebrowser/music`
    - NextExplorer: `/mnt/nextexplorer/<location>/music`, where `<location>` is a location such as `Files`.
-7. Add indexers in Lidarr's **Settings → Indexers**. If you use Prowlarr on this server, select Lidarr in Prowlarr's **Connect Apps** action. Indexers configured in Prowlarr then sync to Lidarr without copying API keys.
+7. Add indexers in Lidarr's **Settings → Indexers**. If you use Prowlarr on this server, run **Connect Prowlarr**. Indexers configured in Prowlarr then sync to Lidarr without copying API keys.
 8. Choose your quality and metadata profiles, then add an artist with **Library → Add New**. Follow the upstream quick-start guide for monitoring and searching.
 
 Keep downloads and the music library in different directories on the same selected file manager for hardlinks and fast moves. Lidarr cannot import downloads saved only inside qBittorrent's local storage.
@@ -34,6 +34,7 @@ For existing music, follow **Importing an Existing Library** before adding its r
 - **Media Storage** changes the file managers Lidarr can access and restarts it. Existing files stay where they are; removing a file manager makes its folders unavailable to Lidarr.
 - **Connect qBittorrent** / **Disconnect qBittorrent** adds or removes the `qBittorrent (StartOS)` download client. Its address and API key follow qBittorrent automatically; you do not need to reconnect after changing qBittorrent's password.
 - **Connect NZBGet** / **Disconnect NZBGet** manages only `NZBGet (StartOS)` and restarts Lidarr. It uses category `lidarr` initially; keep that category in NZBGet, or change it consistently in both applications. The restricted connection credentials follow NZBGet automatically and remain valid when its admin password is reset. Existing qBittorrent and manually named clients remain untouched.
+- **Connect Prowlarr** / **Disconnect Prowlarr** adds Lidarr to Prowlarr's **Settings → Apps** as `Lidarr (StartOS)`, so Prowlarr syncs its indexers here, or removes it, and restarts Lidarr. Disconnecting leaves the indexers already synced; delete the ones ending in **(Prowlarr)** under **Settings → Indexers**.
 - You can configure another download client manually in Lidarr. Its completed files must be accessible through one of your selected file managers.
 
 Back up your selected file manager as well as Lidarr: Lidarr's backup covers its settings and library database, not your music files.
