@@ -45,6 +45,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       qbittorrentConnected: s.qbittorrentConnected,
       nzbgetConnected: s.nzbgetConnected,
       prowlarrConnected: s.prowlarrConnected,
+      prowlarrLegacyPending: s.prowlarrLegacyPending,
       prowlarrRemovalPending: s.prowlarrRemovalPending,
     }))
     .const(effects)
@@ -88,7 +89,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
     : null
 
   const prowlarrAddress =
-    store.prowlarrConnected !== false || store.prowlarrRemovalPending
+    store.prowlarrConnected !== false ||
+    store.prowlarrLegacyPending ||
+    store.prowlarrRemovalPending
       ? await sdk.host
           .getBridgeAddress(effects, {
             packageId: 'prowlarr',
@@ -209,7 +212,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     : null
 
   const prowlarrLegacy =
-    prowlarrAddress && store.prowlarrConnected === null
+    prowlarrAddress && store.prowlarrLegacyPending
       ? await FileHelper.json(
           `${await subcontainer.rootfs}${prowlarrMountpoint}/legacy-applications.json`,
           legacyApplicationsShape,
@@ -270,15 +273,17 @@ export const main = sdk.setupMain(async ({ effects }) => {
         fn: async (_, signal) => {
           if (!prowlarrAddress && !store.prowlarrRemovalPending) return null
           if (prowlarrAddress && !prowlarrApiKey) return null
-          // An undecided connection waits for Prowlarr's legacy handoff.
           if (
             prowlarrAddress &&
-            store.prowlarrConnected === null &&
+            store.prowlarrLegacyPending &&
             prowlarrLegacy === null
           )
             return null
+          const legacy = prowlarrLegacy?.lidarr ?? null
           const storedId =
-            (await storeJson.read((s) => s.prowlarrAppId).once()) ?? null
+            (await storeJson.read((s) => s.prowlarrAppId).once()) ??
+            legacy?.appId ??
+            null
           const { connected, appId } =
             prowlarrAddress && prowlarrApiKey
               ? await reconcileProwlarrApplication(
@@ -287,7 +292,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
                     id: 'lidarr',
                     storedId,
                     connected: store.prowlarrConnected,
-                    legacy: prowlarrLegacy?.lidarr ?? null,
+                    legacy,
                     values: ownAddress
                       ? {
                           baseUrl: `http://${ownAddress}`,
@@ -302,6 +307,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
               current === null ||
               signal.aborted ||
               current.prowlarrConnected !== store.prowlarrConnected ||
+              current.prowlarrLegacyPending !== store.prowlarrLegacyPending ||
               current.prowlarrRemovalPending !== store.prowlarrRemovalPending
             )
               return null
@@ -309,6 +315,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
               ...current,
               prowlarrConnected: connected,
               prowlarrAppId: appId,
+              prowlarrLegacyPending: false,
               prowlarrRemovalPending: false,
             }
           })
