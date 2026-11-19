@@ -51,7 +51,7 @@ Lidarr owns three volumes. Media files live on selected file-manager volumes, mo
 | NextExplorer `data`        | `/mnt/nextexplorer`            | Shared media and completed downloads, one folder per location, while selected and installed                 |
 | qBittorrent `public`       | `/mnt/qbittorrent` (read-only) | Its Web API key, while connected and installed                                                              |
 | NZBGet `public`            | `/mnt/nzbget` (read-only)      | Restricted integration credentials, while connected and installed                                           |
-| Prowlarr `public`          | `/mnt/prowlarr` (read-only)    | Its API key, while installed and the connection is on, undecided, or pending removal                        |
+| Prowlarr `public`          | `/mnt/prowlarr` (read-only)    | Its API key, while installed and the connection is on, undecided, or awaiting removal                       |
 
 The media mount points match qBittorrent, NZBGet and Jellyfin. Download paths reported by either downloader therefore need no remote path mapping. A download and library directory on the same mount can share hardlinks; different file managers cannot.
 
@@ -59,11 +59,11 @@ The media mount points match qBittorrent, NZBGet and Jellyfin. Download paths re
 
 Three models separate package state, upstream configuration, and the API-key sharing contract.
 
-| File                 | Format | Ownership                                                                                                                                                                                                 |
-| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `startos/store.json` | JSON   | Install seeds `apiKey`; actions set `adminPassword`, `mediaSources`, `qbittorrentConnected`, `nzbgetConnected` and `prowlarrConnected`; reconciliation records each managed client id and `prowlarrAppId` |
-| `main/config.xml`    | XML    | Install disables analytics; every start merges the managed keys below, preserving other keys                                                                                                              |
-| `public/api-key`     | Text   | Init publishes the stored API key, without a newline                                                                                                                                                      |
+| File                 | Format | Ownership                                                                                                                                                                                                                           |
+| -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `startos/store.json` | JSON   | Install seeds `apiKey`; actions set `adminPassword`, `mediaSources`, `qbittorrentConnected`, `nzbgetConnected`, `prowlarrConnected` and `prowlarrRemovalPending`; reconciliation records each managed client id and `prowlarrAppId` |
+| `main/config.xml`    | XML    | Install disables analytics; every start merges the managed keys below, preserving other keys                                                                                                                                        |
+| `public/api-key`     | Text   | Init publishes the stored API key, without a newline                                                                                                                                                                                |
 
 The stored admin password is plaintext on the unmounted `startos` volume because Lidarr's API requires the original value to reconcile its hashed credential. It is never placed in `config.xml` or written directly into the database.
 
@@ -89,9 +89,9 @@ qBittorrent's bridge address comes from its exported host id and internal port, 
 
 NZBGet is resolved through its exported binding in the same way. Only the username and password from its `public/credentials.json` are watched reactively; changing NZBGet's published download path does not restart Lidarr. Startup reconciles the separate restricted username/password into Lidarr's database. Missing addresses or credentials leave the existing managed record untouched; it heals when the dependency returns. Credentials are not copied into this package's own file models, though Lidarr's database retains its configured client credential.
 
-Prowlarr is resolved through its exported binding as well, and its API key read from `/mnt/prowlarr/api-key`; a change to either restarts Lidarr. The `prowlarr` oneshot calls `reconcileProwlarrApplication`, imported from `prowlarr-startos`: connected, it creates or updates the application `Lidarr (StartOS)` in Prowlarr with Lidarr's own bridge address and API key and sync level **Full Sync**, adopting a record by its stored id, that name, or the name `Lidarr` an earlier Prowlarr release created; disconnected, it deletes that record. It does not require `primary` and retries until Prowlarr answers. An explicit disconnect keeps cleanup pending even if an interrupted registration has not saved the application's id; reconciliation then finds the record by its reserved or legacy name. While Prowlarr is absent nothing of it is mounted, and a pending removal is dropped. Prowlarr deletes the record itself when Lidarr is uninstalled. Reconciliation cannot overwrite a newer connection choice made by an action.
+Prowlarr is resolved through its exported binding as well, and its API key read from `/mnt/prowlarr/api-key`; a change to either restarts Lidarr. The `prowlarr` oneshot calls `reconcileProwlarrApplication`, imported from `prowlarr-startos`: connected, it creates or updates the application `Lidarr (StartOS)` in Prowlarr with Lidarr's own bridge address and API key and sync level **Full Sync**, adopting a record by its stored id, that name, or the name `Lidarr` an earlier Prowlarr release created; disconnected, it deletes that record. It does not require `primary` and retries until Prowlarr answers. While Prowlarr is absent nothing of it is mounted, and a pending removal is dropped. Prowlarr deletes the record itself when Lidarr is uninstalled.
 
-`prowlarrConnected` is `null` on an install updated from a release without **Connect Prowlarr**: once Prowlarr answers, it becomes `true`, keeping the record, if Prowlarr already has one for Lidarr, and `false` otherwise. Fresh installs start at `false`.
+`prowlarrConnected` is `null` on an install updated from a release without **Connect Prowlarr**: once Prowlarr answers, it becomes `true`, keeping the record, if Prowlarr already has one for Lidarr, and `false` otherwise. Fresh installs start at `false`. A completed reconciliation never overwrites a later action's choice. Disconnecting records `prowlarrRemovalPending` until deletion succeeds or Prowlarr is absent; a missing stored id does not prove that no record exists.
 
 ## Network Access and Interfaces
 
