@@ -51,7 +51,7 @@ Lidarr owns three volumes. Media files live on selected file-manager volumes, mo
 | NextExplorer `data`        | `/mnt/nextexplorer`            | Shared media and completed downloads, one folder per location, while selected and installed                 |
 | qBittorrent `public`       | `/mnt/qbittorrent` (read-only) | Its Web API key, while connected and installed                                                              |
 | NZBGet `public`            | `/mnt/nzbget` (read-only)      | Restricted integration credentials, while connected and installed                                           |
-| Prowlarr `public`          | `/mnt/prowlarr` (read-only)    | Its API key, while installed and the connection is on or undecided                                          |
+| Prowlarr `public`          | `/mnt/prowlarr` (read-only)    | Its API key, while installed and the connection is on, undecided, or pending removal                        |
 
 The media mount points match qBittorrent, NZBGet and Jellyfin. Download paths reported by either downloader therefore need no remote path mapping. A download and library directory on the same mount can share hardlinks; different file managers cannot.
 
@@ -89,7 +89,7 @@ qBittorrent's bridge address comes from its exported host id and internal port, 
 
 NZBGet is resolved through its exported binding in the same way. Only the username and password from its `public/credentials.json` are watched reactively; changing NZBGet's published download path does not restart Lidarr. Startup reconciles the separate restricted username/password into Lidarr's database. Missing addresses or credentials leave the existing managed record untouched; it heals when the dependency returns. Credentials are not copied into this package's own file models, though Lidarr's database retains its configured client credential.
 
-Prowlarr is resolved through its exported binding as well, and its API key read from `/mnt/prowlarr/api-key`; a change to either restarts Lidarr. The `prowlarr` oneshot calls `reconcileProwlarrApplication`, imported from `prowlarr-startos`: connected, it creates or updates the application `Lidarr (StartOS)` in Prowlarr with Lidarr's own bridge address and API key and sync level **Full Sync**, adopting a record by its stored id, that name, or the name `Lidarr` an earlier Prowlarr release created; disconnected, it deletes that record. It does not require `primary` and retries until Prowlarr answers. While Prowlarr is absent nothing of it is mounted, and a pending removal is dropped. Prowlarr deletes the record itself when Lidarr is uninstalled.
+Prowlarr is resolved through its exported binding as well, and its API key read from `/mnt/prowlarr/api-key`; a change to either restarts Lidarr. The `prowlarr` oneshot calls `reconcileProwlarrApplication`, imported from `prowlarr-startos`: connected, it creates or updates the application `Lidarr (StartOS)` in Prowlarr with Lidarr's own bridge address and API key and sync level **Full Sync**, adopting a record by its stored id, that name, or the name `Lidarr` an earlier Prowlarr release created; disconnected, it deletes that record. It does not require `primary` and retries until Prowlarr answers. An explicit disconnect keeps cleanup pending even if an interrupted registration has not saved the application's id; reconciliation then finds the record by its reserved or legacy name. While Prowlarr is absent nothing of it is mounted, and a pending removal is dropped. Prowlarr deletes the record itself when Lidarr is uninstalled. Reconciliation cannot overwrite a newer connection choice made by an action.
 
 `prowlarrConnected` is `null` on an install updated from a release without **Connect Prowlarr**: once Prowlarr answers, it becomes `true`, keeping the record, if Prowlarr already has one for Lidarr, and `false` otherwise. Fresh installs start at `false`.
 
@@ -111,7 +111,7 @@ Before the first daemon launch, Forms authentication is enforced without an exis
 
 ## Actions
 
-Four actions write package state; changes read by `main` restart the service and apply on the next start if it was stopped.
+Five actions write package state; changes read by `main` restart the service and apply on the next start if it was stopped.
 
 ### Set Admin Password / Reset Admin Password
 
