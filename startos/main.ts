@@ -217,7 +217,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           `${await subcontainer.rootfs}${prowlarrMountpoint}/legacy-applications.json`,
           legacyApplicationsShape,
         )
-          .read()
+          .read((legacy) => ({ entry: legacy.lidarr ?? null }))
           .const(effects)
       : null
 
@@ -279,7 +279,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
             prowlarrLegacy === null
           )
             return null
-          const legacy = prowlarrLegacy?.lidarr ?? null
+          const legacy = prowlarrLegacy?.entry ?? null
           const storedId =
             (await storeJson.read((s) => s.prowlarrAppId).once()) ??
             legacy?.appId ??
