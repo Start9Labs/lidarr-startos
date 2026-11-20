@@ -70,3 +70,16 @@ export const nzbgetDescription = {
   fr_FR:
     'Optionnel. Permet à Lidarr d’envoyer les téléchargements Usenet à NZBGet. À activer avec Connecter NZBGet.',
 }
+
+export const prowlarrDescription = {
+  en_US:
+    'Optional. Syncs the indexers in Prowlarr to Lidarr. Enabled with Connect Prowlarr.',
+  es_ES:
+    'Opcional. Sincroniza los indexadores de Prowlarr con Lidarr. Se activa con Conectar Prowlarr.',
+  de_DE:
+    'Optional. Synchronisiert die Indexer aus Prowlarr mit Lidarr. Aktivierung über Prowlarr verbinden.',
+  pl_PL:
+    'Opcjonalne. Synchronizuje indeksatory z Prowlarr do Lidarr. Włączane w Połącz Prowlarr.',
+  fr_FR:
+    'Optionnel. Synchronise les indexeurs de Prowlarr avec Lidarr. À activer avec Connecter Prowlarr.',
+}
